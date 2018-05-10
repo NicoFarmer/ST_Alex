@@ -6,6 +6,8 @@ BSP_DISCO_F429ZI/Drivers/BSP/Components/stmpe811
 BSP_DISCO_F429ZI/Drivers/BSP/STM32F429I-Discovery
 BSP_DISCO_F429ZI/Utilities/Fonts
 LCD_DISCO_F429ZI
+mbed-dsp/cmsis_dsp
+mbed-dsp/dsp
 mbed-os
 mbed-os/cmsis
 mbed-os/cmsis/TARGET_CORTEX_M

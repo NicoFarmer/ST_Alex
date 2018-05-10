@@ -7,7 +7,7 @@
 #include "hal/dma_api.h"
 #include "LCD_DISCO_F429ZI.h"
 #include "Timer.h"
-
+//coucou
 #define PERIODE_ECH 2       // [msec]
 #define DUREE_ACQUI 10000    // [msec]
 #define BUFFSIZE (DUREE_ACQUI/PERIODE_ECH)

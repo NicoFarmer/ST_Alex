@@ -8,9 +8,26 @@
 #include "LCD_DISCO_F429ZI.h"
 #include "Timer.h"
 
-#define PERIODE_ECH 2       // [msec]
+/* Include arm_math.h mathematic functions */
+#include "arm_math.h"
+/* Include mbed-dsp libraries */
+#include "arm_common_tables.h"
+#include "arm_const_structs.h"
+#include "math_helper.h"
+
+// ------------------------------
+// Variables et constantes pour l'acquisition
+#define PERIODE_ECH 12       // [msec]
+#define FREQ_ECH_HZ (1000.0f/PERIODE_ECH)
 #define DUREE_ACQUI 10000    // [msec]
-#define BUFFSIZE (DUREE_ACQUI/PERIODE_ECH)
+#define BUFFSIZE (1024)
+// ------------------------------
+// Variables et constantes pour la FFT
+#define FFT_SIZE  (BUFFSIZE/2)
+float input_fft[BUFFSIZE];
+float output_fft[FFT_SIZE];
+
+
 // ------------------------------
 // Variables et constantes pour l'oscillo
 #define NBRE_PIXEL_X 240
@@ -130,6 +147,8 @@ void Acquisition()
         }
         // Fin de l'acquisition
         thread_Oscillo.signal_set(SIG_ACQ_READY);
+        thread_Pulsation.signal_set(SIG_ACQ_READY);
+
     }
 }
 
@@ -200,6 +219,53 @@ void Oscillo()
 }
 
 // ________________________________
+void Pulsation()
+{
+    int start_time;
+    char strbuff[100];
+
+    while(running)
+    {
+        // Attend le signal de fin d'acquisition
+        Thread::signal_wait(SIG_ACQ_READY);
+        notify("La tache de pulsation commence ...");
+
+        // Calcul FFT
+        // Info pour le calcul de la TFT
+        /*
+         * For purely real inputs, you will always have ambiguity in the FFT outputs.
+         * That is, you'll always see the FFT magnitude response mirrored around 1/2 the sample frequency.
+         * From your post, it looks like you have purely real inputs.
+         * It looks to me like your example input signal frequency is not 10 kHz (assuming you're true sample rate is 40 kHz).
+         * A 10 kHz signal should show peaks in bins 4 (4 * 40 kHz / 16 = 10 kHz) and 12 (12 * 40 kHz / 16 = 30 kHz) for a 16 point FFT. Note that I always reference bins starting from 0. Without the raw ADC samples it's hard to say what going on with your processing, though.
+         */
+        // Init the Complex FFT module, intFlag = 0, doBitReverse = 1
+        for (int i=0; i<BUFFSIZE; i+=2)
+        {
+            input_fft[i] = data_buffer2[i];
+            input_fft[i+1] = 0;     // Partie immaginaire à "0"
+        }
+        //NB using predefined arm_cfft_sR_f32_lenXXX, in this case XXX is 256
+        arm_cfft_f32(&arm_cfft_sR_f32_len512, input_fft, 0, 1);
+        // Complex Magniture Module put results into Output(Half size of the Input)
+        // Relation entre fréquence dans le tableau de sortie et période d'échantillonnage
+        // output_fft[index]
+        //      Frequence = index * FrequenceEchantillonnage/FFT_SIZE
+        arm_cmplx_mag_f32(input_fft, output_fft, FFT_SIZE);
+
+        sprintf(strbuff, "Resultat FFT");
+        notify(strbuff);
+        for (int i=0; i<FFT_SIZE/5; i++)
+        {
+            sprintf(strbuff, "%f [Hz]; %f", i*FREQ_ECH_HZ/FFT_SIZE, output_fft[i]);
+            notify(strbuff);
+        }
+
+        notify("La tache de pulsation est terminee ...");
+    }
+}
+
+// ________________________________
 /*void Acquisition()
 {
     while (running)
@@ -214,6 +280,7 @@ void Oscillo()
 }
 */
 // ________________________________
+/*
 void Compute()
 {
     int start_time;
@@ -235,7 +302,7 @@ void Compute()
         thread_Display.signal_set(0x2);
     }
 }
-
+*/
 // ________________________________
 void Display()
 {
@@ -270,6 +337,7 @@ int main()
 
     thread_Acqui.start(callback(Acquisition));
     thread_Oscillo.start(callback(Oscillo));
+    thread_Pulsation.start(callback(Pulsation));
     //thread_Compute.start(callback(Compute));
     //thread_Display.start(callback(Display));
     thread_Blink.start(callback(blink, &led1));
